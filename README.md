@@ -105,7 +105,7 @@ boolean_factor → ( boolean_expr ) | boolean_identifier
 boolean_identifier → 0|1
 or → +
 and → *
-```
+
 Grammar for `strings`:
 new_expr → string_expr | new_expr = string_expr
 string_expr  → string_expr concatenation string_term | string_term
@@ -114,4 +114,4 @@ string_factor → ( string_expr ) | digit
 digit → 0|1|2|3|4|5|6|7|8|9
 concatenation → +
 power → *
-
+```
