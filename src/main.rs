@@ -32,7 +32,18 @@ fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 							}
 							_ => { stack.push(a + b); }
 						}
-						
+					}
+					Token::Minus => {
+						let a = stack.pop().unwrap();
+						let b = stack.pop().unwrap();
+						stack.push(b - a);
+					}
+					Token::Power => {
+						let a = stack.pop().unwrap();
+						let mut b = stack.pop().unwrap();
+						let repeat = b;
+						for _ in 1..a { b *= repeat; }
+						stack.push(b);
 					}
 					Token::Multiply => {
 						let a = stack.pop().unwrap();
@@ -98,7 +109,7 @@ fn shunting_yard(domain: Domain, tokens: Vec<Token>) -> Vec<Token> {
             		rpn_stack.push(token);
             	}	
             },
-            Token::Plus | Token::Multiply => {
+            Token::Plus | Token::Multiply | Token::Minus | Token::Power => {
                 while let Some(o) = stack.pop() {
                     if token.clone().operator_precedence() <= o.clone().operator_precedence() {
                         rpn_stack.push(o);
@@ -150,9 +161,11 @@ fn tokenize(text: String) -> Vec<Vec<Token>> {
 	            ')' => { tokens.push(Token::RightParentheses); }
 	            '(' => { tokens.push(Token::LeftParentheses); }
 	            '+' => { tokens.push(Token::Plus); }
+	            '-' => { tokens.push(Token::Minus); }
 	            '{' => { tokens.push(Token::LeftMustache); }
 	            '}' => { tokens.push(Token::RightMustache); }
 	            '*' => { tokens.push(Token::Multiply); }
+	            '^' => { tokens.push(Token::Power); }
 	            _ => {}
 	        }
 	    }
@@ -167,7 +180,7 @@ fn main() {
         <strings>
             2 * 3 + 1 = 2 + 2 + 2 + 1 
             <algebra>
-                 2 * 3 + 1 = (1 + 1) * 2 + 2 + 1 = 7
+                 2 ^ 3 - 1 = (1 + 1) * 2 + 2 + 1 = 7
                  <sets>
                        {1, 2} + ({1, 2, 3} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3}
                  </sets>
