@@ -1,0 +1,8 @@
+[package]
+name = "ExpressionVerifier"
+version = "0.1.0"
+authors = ["Orochimaru Nakamoto <brantleigh.bunting@gmail.com>"]
+
+[dependencies]
+quick-xml = "0.12.0"
+time = "*"
