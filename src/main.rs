@@ -1,13 +1,5 @@
-#![allow(non_snake_case)]
-#![allow(unused_assignments)]
-#![allow(unused_mut)]
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 extern crate quick_xml;
 extern crate time;
-
-use std::fmt;
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -16,87 +8,47 @@ use std::collections::HashSet;
 
 use time::PreciseTime;
 
-#[derive(Debug, Clone, PartialEq)]
-enum Token {
-    Number(i64),
-    Set(HashSet<i64>),
-    Plus,
-    Multiply,
-    LeftMustache,
-    RightMustache,
-    LeftParentheses,
-    RightParentheses
-}
+mod token;
+mod domain;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Domain {
-	Strings,
-	Algebra,
-	Sets,
-	Boolean
-}
-
-impl fmt::Display for Domain {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-    	match self {
-    		Domain::Strings => { write!(formatter, "Strings") }
-    	    Domain::Algebra => {write!(formatter, "Algebra")}
-    		Domain::Sets => {write!(formatter, "Sets")}
-    		Domain::Boolean => {write!(formatter, "Boolean")}
-    	} 
-    }
-}
-
-impl Token {
-    fn get_weight(self) -> i64 {
-        match self {
-            Token::Plus => 1,
-            Token::Multiply => 2,
-            _ => 0,
-        }
-    }
-}
+use token::Token;
+use domain::Domain;
 
 fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 	let mut stack: Vec<i64> = Vec::new();
 	let mut set_stack: Vec<HashSet<i64>> = Vec::new();
 
 	match domain {
-		Domain::Algebra | Domain::Strings => {
+		Domain::Algebra | Domain::Strings | Domain::Boolean => {
 			for token in tokens {
 				match token {
 					Token::Number(val) => stack.push(val),
 					Token::Plus => {
 						let a = stack.pop().unwrap();
 						let b = stack.pop().unwrap();
-						stack.push(a + b);
+						match domain {
+							Domain::Boolean => {
+								stack.push(a | b);
+							}
+							_ => { stack.push(a + b); }
+						}
+						
 					}
 					Token::Multiply => {
 						let a = stack.pop().unwrap();
 						let b = stack.pop().unwrap();
-						stack.push(a * b);
+						match domain {
+							Domain::Boolean => {
+								stack.push(a & b);
+							}
+							_ => { stack.push(a * b); }
+						}
+						
 					}
 					_ => {}
 				}
 			}
-		}
-		Domain::Boolean => {
-			for token in tokens {
-				match token {
-					Token::Number(val) => stack.push(val),
-					Token::Plus => {
-						let a = stack.pop().unwrap();
-						let b = stack.pop().unwrap();
-						stack.push(a | b);
-					}
-					Token::Multiply => {
-						let a = stack.pop().unwrap();
-						let b = stack.pop().unwrap();
-						stack.push(a & b);
-					}
-					_ => {}
-				}
-			}
+			return (stack.pop().unwrap(), HashSet::new());
 		}
 		Domain::Sets => {
 			for token in tokens {
@@ -122,46 +74,9 @@ fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 					_ => {}
 				}
 			}
+			return (0, set_stack.pop().unwrap());
 		}
-		_ => {}
-	}
-	if domain == Domain::Sets {
-		return (0, set_stack.pop().unwrap());
-	} else {
-		return (stack.pop().unwrap(), HashSet::new());
 	}	
-}
-
-fn recognize_string_expression(
-    number_stack: &mut Vec<i64>, 
-    operation_stack: &mut Vec<Token>
-) -> String {
-    let mut string_to_build = String::from("");
-    /* Lets pop from the stacks and rebuild the expression */
-    while let Some(number) = number_stack.pop() {
-        if let Some(operation) = operation_stack.pop() {
-            match operation {
-                Token::Plus => {
-                    string_to_build.push_str(&format!("{}", number));
-                    string_to_build.push_str(" + ");
-                } 
-                Token::Multiply => {
-                    if let Some(next_num) = number_stack.pop() {
-                        string_to_build.push_str(&format!("{}", next_num));
-                        for i in 1..number {
-                             string_to_build.push_str(" + "); 
-                             string_to_build.push_str(&format!("{}", next_num));
-
-                        }
-                    }
-                }
-                _ => {/* TODO: Handle Parentheses */}
-            }
-        } else {
-            string_to_build.push_str(&format!("{}", number));
-        }
-    }
-    string_to_build
 }
 
 /* The Shunting-Yard Algorithm produces Reverse Polish Notation Vec<Token> */
@@ -185,7 +100,7 @@ fn shunting_yard(domain: Domain, tokens: Vec<Token>) -> Vec<Token> {
             },
             Token::Plus | Token::Multiply => {
                 while let Some(o) = stack.pop() {
-                    if token.clone().get_weight() <= o.clone().get_weight() { /* If our token is higher precedence, do the thing */
+                    if token.clone().operator_precedence() <= o.clone().operator_precedence() {
                         rpn_stack.push(o);
                     } else {
                         stack.push(o);
@@ -194,36 +109,25 @@ fn shunting_yard(domain: Domain, tokens: Vec<Token>) -> Vec<Token> {
                 }
                 stack.push(token)
             },
-            
-            Token::LeftMustache => stack.push(token),
-            Token::RightMustache => {
-            	let mut mustache = false;
-            	while let Some(op) = stack.pop() {
-            		match op {
-            			Token::LeftMustache => {
-            				mustache = true;
+            Token::LeftParentheses | Token::LeftMustache => stack.push(token),
+            Token::RightParentheses | Token::RightMustache => {
+                let mut closure = false;
+                while let Some(op) = stack.pop() {
+                    match op {
+                    	Token::LeftMustache => {
+            				closure = true;
 			    			rpn_stack.push(Token::Set(set.clone()));
 			    			set.clear(); /* Clear the previous set of integers */
             				break;
             			},
-            			_ => rpn_stack.push(op),
-            		}
-            	}
-            	assert!(mustache)
-            }
-            Token::LeftParentheses => stack.push(token),
-            Token::RightParentheses => {
-                let mut parentheses = false;
-                while let Some(op) = stack.pop() {
-                    match op {
                         Token::LeftParentheses => {
-                            parentheses = true;
+                            closure = true;
                             break;
                         },
                         _ => rpn_stack.push(op),
                     }
                 }
-                assert!(parentheses)
+                assert!(closure)
             },
         }
     }
@@ -233,32 +137,6 @@ fn shunting_yard(domain: Domain, tokens: Vec<Token>) -> Vec<Token> {
     rpn_stack
 }
 
-fn tokenize_string(text: String, numbers: &mut Vec<i64>, operators: &mut Vec<Token>) {
-	let mut is_left: bool = true;
-    
-    let mut iterator = text.chars().peekable();
-    while let Some(&c) = iterator.peek() {
-        match c {
-            '0' ... '9' => { 
-                iterator.next();
-                numbers.push(c.to_string().parse::<i64>().unwrap());
-            }
-            '+' => { 
-                iterator.next();
-                operators.push(Token::Plus);                
-            }
-            '*' => { 
-                iterator.next();
-                operators.push(Token::Multiply);
-            }
-            _ => {
-                /* Sink others */
-                iterator.next();
-            }
-        }
-    }
-}
-
 fn tokenize(text: String) -> Vec<Vec<Token>> {
 	let mut col_tokens: Vec<Vec<Token>> = Vec::new();
 	for s_text in text.split("=") {
@@ -266,42 +144,16 @@ fn tokenize(text: String) -> Vec<Vec<Token>> {
 		let mut tokens: Vec<Token> = Vec::new();
 
 	    while let Some(&c) = iterator.peek() {
+	    	iterator.next();
 	        match c {
-	            '0' ... '9' => { 
-	                iterator.next();
-	                tokens.push(Token::Number(c.to_string().parse::<i64>().unwrap()));                            
-	            }
-	            /* (1 + 1) * */
-	            ')' => {
-	                iterator.next();
-	                tokens.push(Token::RightParentheses);
-	            }
-
-	            '(' => {
-	                iterator.next();
-	                tokens.push(Token::LeftParentheses);
-	            }
-
-	            '+' => { 
-	                iterator.next();
-	                tokens.push(Token::Plus);
-	            }
-	            '{' => {
-	            	iterator.next();
-	            	tokens.push(Token::LeftMustache);
-	            }
-	            '}' => {
-	            	iterator.next();
-	            	tokens.push(Token::RightMustache);
-	            }
-	            '*' => { 
-	                iterator.next();
-	                tokens.push(Token::Multiply);
-	            }
-	            _ => {
-	                /* Sink others */
-	                iterator.next();
-	            }
+	            '0' ... '9' => { tokens.push(Token::Number(c.to_string().parse::<i64>().unwrap())); }
+	            ')' => { tokens.push(Token::RightParentheses); }
+	            '(' => { tokens.push(Token::LeftParentheses); }
+	            '+' => { tokens.push(Token::Plus); }
+	            '{' => { tokens.push(Token::LeftMustache); }
+	            '}' => { tokens.push(Token::RightMustache); }
+	            '*' => { tokens.push(Token::Multiply); }
+	            _ => {}
 	        }
 	    }
 	    col_tokens.push(tokens);
@@ -332,16 +184,12 @@ fn main() {
    
     let mut reader = Reader::from_str(xml);
     reader.trim_text(true);
-	let mut txt:Vec<String> = Vec::new();
+
 	let mut buf = Vec::new();
-	// The `Reader` does not implement `Iterator` because it outputs borrowed data (`Cow`s)
+	println!("================================================");
 	loop {
 	    match reader.read_event(&mut buf) {
-	    // for triggering namespaced events, use this instead:
-	    // match reader.read_namespaced_event(&mut buf) {
 	        Ok(Event::Start(ref e)) => {
-	        // for namespaced:
-	        // Ok((ref namespace_value, Event::Start(ref e)))
 	            match e.name() {
 	                b"strings" => { domain_stack.push(Domain::Strings); }
 	                b"algebra" => { domain_stack.push(Domain::Algebra); }
@@ -350,7 +198,6 @@ fn main() {
 	                _ => (),
 	            }
 	        },
-	        // unescape and decode the text event using the reader encoding
 	        Ok(Event::Text(e)) => { 
 	        	let mut equal = true;
 	        	let bag_of_tokens = tokenize(e.unescape_and_decode(&reader).unwrap());
@@ -378,14 +225,13 @@ fn main() {
 		        		}
 		        	}
 
-		        	println!("
-	Domain: {},
-	Raw Statement: {},
-	Resolved To: {},
-	Valid: {}
-		        	", 
-			        	domain,
+		        	println!("\tStatement: \t{},
+	Domain: \t{},
+	Resolved To: \t{},
+	Valid: \t\t{}
+================================================", 
 			        	e.unescape_and_decode(&reader).unwrap(), 
+			        	domain,
 			        	resolved,
 			        	equal
 		        	);
@@ -407,21 +253,19 @@ fn main() {
 		        		}
 		        	}
 
-		        	println!("
-	Domain: {},
-	Raw Statement: {},
-	Resolved To: {},
-	Valid: {}
-		        	", 
-			        	domain,
-			        	e.unescape_and_decode(&reader).unwrap(), 
+		        	println!("\tStatement: \t{},
+	Domain: \t{},
+	Resolved To: \t{},
+	Valid: \t\t{}
+================================================",
+			        	e.unescape_and_decode(&reader).unwrap(),
+			        	domain, 
 			        	resolved,
 			        	equal
 		        	);
 	        	}
 	        },
 	        Ok(Event::End(e)) => {
-
 	        	match e.name() {
 	        		b"strings" => { domain_stack.pop(); }
 	                b"algebra" => { domain_stack.pop(); }
@@ -430,13 +274,13 @@ fn main() {
 	                _ => (),
 	        	}
 	        }
-	        Ok(Event::Eof) => break, // exits the loop when reaching end of file
+	        Ok(Event::Eof) => break,
 	        Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-	        _ => (), // There are several other `Event`s we do not consider here
+	        _ => (),
 	    }
-	    // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
 	    buf.clear();
 	}
+
 	let end = PreciseTime::now();
 	println!("Finished In {} Seconds.", start.to(end));
 }
