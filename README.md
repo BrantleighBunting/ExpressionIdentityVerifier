@@ -63,6 +63,7 @@ Running the command `cargo run` will produce this output:
 
 This project implements the following context free grammar:
 
+```
 Grammar for the `binding control`:
 directory_scope → < identifier > block_objects </ identifier >
 block_objects → various_express scope_change
@@ -104,7 +105,7 @@ boolean_factor → ( boolean_expr ) | boolean_identifier
 boolean_identifier → 0|1
 or → +
 and → *
-
+```
 Grammar for `strings`:
 new_expr → string_expr | new_expr = string_expr
 string_expr  → string_expr concatenation string_term | string_term
