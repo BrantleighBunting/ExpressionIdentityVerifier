@@ -62,7 +62,7 @@ fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 	let mut set_stack: Vec<HashSet<i64>> = Vec::new();
 
 	match domain {
-		Domain::Algebra => {
+		Domain::Algebra | Domain::Strings => {
 			for token in tokens {
 				match token {
 					Token::Number(val) => stack.push(val),
@@ -357,46 +357,7 @@ fn main() {
 
 	        	let domain = *domain_stack.last().unwrap();
 
-	        	if domain == Domain::Strings {
-
-	        		let mut numbers: Vec<i64> = Vec::new();
-                	let mut operators: Vec<Token> = Vec::new();
-
-                	let text = e.unescape_and_decode(&reader).unwrap();
-                	let mut results: Vec<String> = Vec::new();
-
-                	for s_text in text.split("=") {
-                		tokenize_string(
-		        			s_text.to_string(), 
-		        			&mut numbers, 
-		        			&mut operators
-		        		);
-		        		let result = recognize_string_expression(&mut numbers, &mut operators);
-		        		results.push(result);
-                	}
-
-	        		let mut resolved = String::from("");
-                	for (index, result) in results.clone().iter().enumerate() { 
-		        		equal = *result == results[0];
-		        		resolved.push_str(&format!("{:?}", result));
-		        		if index < results.len() - 1 {
-		        			resolved.push_str(" == ");
-		        		}
-		        	}
-
-	        		println!("
-	Domain: {},
-	Raw Statement: {},
-	Resolved To: {},
-	Valid: {}
-		        	", 
-			        	domain,
-			        	e.unescape_and_decode(&reader).unwrap(), 
-			        	resolved,
-			        	equal
-		        	);
-
-	        	} else if domain == Domain::Sets {
+	        	if domain == Domain::Sets {
 	        		let mut results_to_compare: Vec<HashSet<i64>> = Vec::new();
 
 	        		for tokens in bag_of_tokens {
