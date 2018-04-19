@@ -8,6 +8,9 @@ use std::collections::HashSet;
 
 use time::PreciseTime;
 
+use std::fs::File;
+use std::io::prelude::*;
+
 mod token;
 mod domain;
 
@@ -174,28 +177,171 @@ fn tokenize(text: String) -> Vec<Vec<Token>> {
    	col_tokens
 }
 
+fn handle_sets_text(text: String, domain: Domain) {
+	let mut equal: bool = true;
+
+	let mut results_to_compare: Vec<HashSet<i64>> = Vec::new();
+
+	if text.contains(";") {
+		for s_text in text.split(";") {
+			let bag_of_tokens = tokenize(s_text.trim().clone().to_string());
+
+			for tokens in bag_of_tokens {
+				let set: HashSet<i64> = resolve(
+					domain, 
+					shunting_yard(domain, tokens)
+				).1;
+				results_to_compare.push(set);
+			}
+
+
+			let mut resolved = String::from("");
+			for (index, result) in results_to_compare.clone().iter().enumerate() { 
+				equal = *result == results_to_compare[0];
+				resolved.push_str(&format!("{:?}", result));
+				if index < results_to_compare.len() - 1 {
+					resolved.push_str(" == ");
+				}
+			}
+
+			println!("\tStatement: \t{},
+	Domain: \t{},
+	Valid: \t\t{}
+================================================", 
+		    	s_text.trim(), 
+		    	domain,
+		    	equal
+			);
+		}
+	} else {
+		let bag_of_tokens = tokenize(text.clone());
+
+		for tokens in bag_of_tokens {
+			let set: HashSet<i64> = resolve(
+				domain, 
+				shunting_yard(domain, tokens)
+			).1;
+			results_to_compare.push(set);
+		}
+
+
+		let mut resolved = String::from("");
+		for (index, result) in results_to_compare.clone().iter().enumerate() { 
+			equal = *result == results_to_compare[0];
+			resolved.push_str(&format!("{:?}", result));
+			if index < results_to_compare.len() - 1 {
+				resolved.push_str(" == ");
+			}
+		}
+
+		println!("\tStatement: \t{},
+	Domain: \t{},
+	Valid: \t\t{}
+================================================", 
+	    	text, 
+	    	domain,
+	    	equal
+		);
+	}
+}
+
+fn handle_other_domains(text: String, domain: Domain) {
+	if text.contains(";") {
+		let coll = text.split(";");
+		for s_text in coll {
+			if s_text == "" { break; }
+
+			let mut equal: bool = true;
+
+			let mut results_to_compare: Vec<i64> = Vec::new();
+
+			let bag_of_tokens = tokenize(s_text.trim().clone().to_string());
+
+			for tokens in bag_of_tokens {
+				let result: i64 = resolve(domain, shunting_yard(domain, tokens)).0;
+				results_to_compare.push(result);
+			}
+
+			let mut resolved = String::from("");
+			for (index, result) in results_to_compare.clone().iter().enumerate() { 
+				equal = *result == results_to_compare[0];
+				resolved.push_str(&format!("{}", result));
+				if index < results_to_compare.len() - 1 {
+					resolved.push_str(" == ");
+				}
+			}
+
+			println!("\tStatement: \t{},
+	Domain: \t{},
+	Valid: \t\t{}
+================================================",
+		    	s_text.trim(),
+		    	domain, 
+		    	equal
+			);
+		}
+	} else {
+		let mut equal: bool = true;
+
+		let mut results_to_compare: Vec<i64> = Vec::new();
+
+		let bag_of_tokens = tokenize(text.clone());
+
+		for tokens in bag_of_tokens {
+			let result: i64 = resolve(domain, shunting_yard(domain, tokens)).0;
+			results_to_compare.push(result);
+		}
+
+		let mut resolved = String::from("");
+		for (index, result) in results_to_compare.clone().iter().enumerate() { 
+			equal = *result == results_to_compare[0];
+			resolved.push_str(&format!("{}", result));
+			if index < results_to_compare.len() - 1 {
+				resolved.push_str(" == ");
+			}
+		}
+
+		println!("\tStatement: \t{},
+	Domain: \t{},
+	Valid: \t\t{}
+================================================",
+	    	text,
+	    	domain, 
+	    	equal
+		);
+	}
+}
+
 fn main() {
 	let start = PreciseTime::now();
-	let xml = r#"
-        <strings>
-            2 * 3 + 1 = 2 + 2 + 2 + 1 
-            <algebra>
-                 2 ^ 3 - 1 = (1 + 1) * 2 + 2 + 1 = 7
-                 <sets>
-                       {1, 2} + ({1, 2, 3} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3}
-                 </sets>
-                 1 + 2 * 2 + 1 = 2 + 2 + 2 * 1;         
-            </algebra>
-            <boolean>
-                 (1 + 0) * 1 + 1 = 0 * 1 + 1
-            </boolean>
-            1 * (2 + 1) + 1 = 1 + 1 + 1 
-        </strings>
-    "#;
+
+	let mut file = File::open("input.xml");
+    let mut xml = String::new();
+    file.unwrap().read_to_string(&mut xml);
+
+
+	// let xml = r#"
+ //        <strings>
+ //            2 * 3 + 1 = 2 + 2 + 2 + 1 
+ //            <algebra>
+ //                 2 ^ 3 - 1 = (1 + 1) * 2 + 2 + 1 = 7
+ //                 <sets>
+ //                       {1, 2} + ({1, 2, 3} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3};
+ //                       {1, 2} + ({1, 2} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3}
+ //                 </sets>
+ //                 1 + 2 * 2 + 1 = 2 + 2 + 2 * 1;
+ //                 1 + 2 * 2 + 1 = 2 + 2 + 2 + 5 * 1;
+ //            </algebra>
+ //            <boolean>
+ //                 (1 + 0) * 1 + 1 = 0 * 1 + 1
+ //            </boolean>
+ //            1 * (2 + 1) + 1 = 1 + 1 + 1 
+ //        </strings>
+ //    "#;
 
     let mut domain_stack: Vec<Domain> = Vec::new();
    
-    let mut reader = Reader::from_str(xml);
+    let mut reader = Reader::from_str(&xml);
     reader.trim_text(true);
 
 	let mut buf = Vec::new();
@@ -212,70 +358,13 @@ fn main() {
 	            }
 	        },
 	        Ok(Event::Text(e)) => { 
-	        	let mut equal = true;
-	        	let bag_of_tokens = tokenize(e.unescape_and_decode(&reader).unwrap());
-
 	        	let domain = *domain_stack.last().unwrap();
 
 	        	if domain == Domain::Sets {
-	        		let mut results_to_compare: Vec<HashSet<i64>> = Vec::new();
-
-	        		for tokens in bag_of_tokens {
-	        			let set: HashSet<i64> = resolve(
-	        				domain, 
-	        				shunting_yard(domain, tokens)
-	        			).1;
-	        			results_to_compare.push(set);
-	        		}
-
-
-	        		let mut resolved = String::from("");
-		        	for (index, result) in results_to_compare.clone().iter().enumerate() { 
-		        		equal = *result == results_to_compare[0];
-		        		resolved.push_str(&format!("{:?}", result));
-		        		if index < results_to_compare.len() - 1 {
-		        			resolved.push_str(" == ");
-		        		}
-		        	}
-
-		        	println!("\tStatement: \t{},
-	Domain: \t{},
-	Resolved To: \t{},
-	Valid: \t\t{}
-================================================", 
-			        	e.unescape_and_decode(&reader).unwrap(), 
-			        	domain,
-			        	resolved,
-			        	equal
-		        	);
+	        		handle_sets_text(e.unescape_and_decode(&reader).unwrap(), domain);
 
 	        	} else {
-		        	let mut results_to_compare: Vec<i64> = Vec::new();
-
-		        	for tokens in bag_of_tokens {
-		        		let result: i64 = resolve(domain, shunting_yard(domain, tokens)).0;
-		        		results_to_compare.push(result);
-		        	}
-
-		        	let mut resolved = String::from("");
-		        	for (index, result) in results_to_compare.clone().iter().enumerate() { 
-		        		equal = *result == results_to_compare[0];
-		        		resolved.push_str(&format!("{}", result));
-		        		if index < results_to_compare.len() - 1 {
-		        			resolved.push_str(" == ");
-		        		}
-		        	}
-
-		        	println!("\tStatement: \t{},
-	Domain: \t{},
-	Resolved To: \t{},
-	Valid: \t\t{}
-================================================",
-			        	e.unescape_and_decode(&reader).unwrap(),
-			        	domain, 
-			        	resolved,
-			        	equal
-		        	);
+		        	handle_other_domains(e.unescape_and_decode(&reader).unwrap(), domain);
 	        	}
 	        },
 	        Ok(Event::End(e)) => {
