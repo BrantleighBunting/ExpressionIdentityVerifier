@@ -319,26 +319,6 @@ fn main() {
     let mut xml = String::new();
     file.unwrap().read_to_string(&mut xml);
 
-
-	// let xml = r#"
- //        <strings>
- //            2 * 3 + 1 = 2 + 2 + 2 + 1 
- //            <algebra>
- //                 2 ^ 3 - 1 = (1 + 1) * 2 + 2 + 1 = 7
- //                 <sets>
- //                       {1, 2} + ({1, 2, 3} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3};
- //                       {1, 2} + ({1, 2} * {2, 3}) = ({1, 2} + {1, 2, 3}) * {2, 3}
- //                 </sets>
- //                 1 + 2 * 2 + 1 = 2 + 2 + 2 * 1;
- //                 1 + 2 * 2 + 1 = 2 + 2 + 2 + 5 * 1;
- //            </algebra>
- //            <boolean>
- //                 (1 + 0) * 1 + 1 = 0 * 1 + 1
- //            </boolean>
- //            1 * (2 + 1) + 1 = 1 + 1 + 1 
- //        </strings>
- //    "#;
-
     let mut domain_stack: Vec<Domain> = Vec::new();
    
     let mut reader = Reader::from_str(&xml);
