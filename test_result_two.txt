@@ -1,0 +1,52 @@
+$AMATERASU{[~/Downloads/3550 Programming Assignment 2 Brantleigh Bunting Connor Speck]} cat test_two.txt 
+<algebra>
+   2 * 3 + 1 = 2 + 2 + 2 + 1
+   <boolean>
+     (1 + 0) * (1 + 1) = 0 * (1 + 1)
+   </boolean>
+   <strings>
+      2 * 3 + 1 = (1 + 1) * 2 + 2 + 1 = 7
+      <sets>
+        ({1,2} + ({1,2,3}) * {2,3} = {1,2} + {1,2,3} * {2,3}
+      </sets>
+      (1 + 2) * 2 + 1 = 2 + 2 + 2 * 1         
+   </strings>
+   <boolean>
+      (1 * 0) * (1 + 1) = 0 * (1 + 1)
+   </boolean>
+   1 * (2 + 1) + 1 = 1 + 1 + 1 
+ </algebra>
+$AMATERASU{[~/Downloads/3550 Programming Assignment 2 Brantleigh Bunting Connor Speck]} cargo run --release test_two.txt 
+    Finished release [optimized] target(s) in 0.43 secs
+     Running `target/release/expression_verifier test_two.txt`
+================================================
+	Statement: 	2 * 3 + 1 = 2 + 2 + 2 + 1,
+	Domain: 	Algebra,
+	Valid: 		true
+================================================
+	Statement: 	(1 + 0) * (1 + 1) = 0 * (1 + 1),
+	Domain: 	Boolean,
+	Valid: 		false
+================================================
+	Statement: 	2 * 3 + 1 = (1 + 1) * 2 + 2 + 1 = 7,
+	Domain: 	Strings,
+	Valid: 		true
+================================================
+	Statement: 	({1,2} + ({1,2,3}) * {2,3} = {1,2} + {1,2,3} * {2,3},
+	Domain: 	Sets,
+	Valid: 		true
+================================================
+	Statement: 	(1 + 2) * 2 + 1 = 2 + 2 + 2 * 1,
+	Domain: 	Strings,
+	Valid: 		false
+================================================
+	Statement: 	(1 * 0) * (1 + 1) = 0 * (1 + 1),
+	Domain: 	Boolean,
+	Valid: 		true
+================================================
+	Statement: 	1 * (2 + 1) + 1 = 1 + 1 + 1,
+	Domain: 	Algebra,
+	Valid: 		false
+================================================
+Finished In PT0.000364234S Seconds.
+$AMATERASU{[~/Downloads/3550 Programming Assignment 2 Brantleigh Bunting Connor Speck]}

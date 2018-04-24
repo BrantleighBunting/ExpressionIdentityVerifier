@@ -4,9 +4,11 @@ extern crate time;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use std::collections::HashSet;
+/* Command Line Args Imports */
+use std::env;
+use std::process;
 
-use time::PreciseTime;
+use std::collections::HashSet;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -21,19 +23,43 @@ fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 	let mut stack: Vec<i64> = Vec::new();
 	let mut set_stack: Vec<HashSet<i64>> = Vec::new();
 
+	let mut build_string: String = String::new();
+
 	match domain {
 		Domain::Algebra | Domain::Strings | Domain::Boolean => {
-			for token in tokens {
+			for (index, token) in tokens.iter().enumerate() {
 				match token {
-					Token::Number(val) => stack.push(val),
+					Token::Number(val) => stack.push(*val),
 					Token::Plus => {
-						let a = stack.pop().unwrap();
-						let b = stack.pop().unwrap();
+						
 						match domain {
 							Domain::Boolean => {
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
 								stack.push(a | b);
 							}
-							_ => { stack.push(a + b); }
+							Domain::Strings => {
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
+
+								build_string.push_str(&a.to_string());
+								build_string.push_str(&b.to_string());
+
+								if (index + 1) < tokens.len() {
+									if tokens[index + 1] == Token::Multiply { /* Handle strings that should resolve to algebra addition */
+										build_string = String::from("");
+										build_string.push_str(&(a + b).to_string())
+									}
+								}			
+
+								stack.push(build_string.parse::<i64>().unwrap());
+								build_string = String::from("");
+							}
+							_ => { 
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
+								stack.push(a + b); 
+							}
 						}
 					}
 					Token::Minus => {
@@ -49,13 +75,28 @@ fn resolve(domain: Domain, tokens: Vec<Token>) -> (i64, HashSet<i64>) {
 						stack.push(b);
 					}
 					Token::Multiply => {
-						let a = stack.pop().unwrap();
-						let b = stack.pop().unwrap();
 						match domain {
 							Domain::Boolean => {
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
 								stack.push(a & b);
 							}
-							_ => { stack.push(a * b); }
+							Domain::Strings => {
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
+
+								for _ in 0..a {
+									build_string.push_str(&b.to_string());
+								}
+
+								stack.push(build_string.parse::<i64>().unwrap());
+								build_string = String::from("");
+							}
+							_ => { 
+								let a = stack.pop().unwrap();
+								let b = stack.pop().unwrap();
+								stack.push(a * b); 
+							}
 						}
 						
 					}
@@ -125,23 +166,17 @@ fn shunting_yard(domain: Domain, tokens: Vec<Token>) -> Vec<Token> {
             },
             Token::LeftParentheses | Token::LeftMustache => stack.push(token),
             Token::RightParentheses | Token::RightMustache => {
-                let mut closure = false;
                 while let Some(op) = stack.pop() {
                     match op {
                     	Token::LeftMustache => {
-            				closure = true;
 			    			rpn_stack.push(Token::Set(set.clone()));
 			    			set.clear(); /* Clear the previous set of integers */
             				break;
             			},
-                        Token::LeftParentheses => {
-                            closure = true;
-                            break;
-                        },
+                        Token::LeftParentheses => { break; },
                         _ => rpn_stack.push(op),
                     }
                 }
-                assert!(closure)
             },
         }
     }
@@ -205,10 +240,12 @@ fn handle_sets_text(text: String, domain: Domain) {
 			}
 
 			println!("\tStatement: \t{},
+	Resolved: \t{},
 	Domain: \t{},
 	Valid: \t\t{}
 ================================================", 
 		    	s_text.trim(), 
+		    	resolved,
 		    	domain,
 		    	equal
 			);
@@ -235,10 +272,12 @@ fn handle_sets_text(text: String, domain: Domain) {
 		}
 
 		println!("\tStatement: \t{},
+	Resolved: \t{},
 	Domain: \t{},
 	Valid: \t\t{}
 ================================================", 
 	    	text, 
+	    	resolved,
 	    	domain,
 	    	equal
 		);
@@ -272,10 +311,12 @@ fn handle_other_domains(text: String, domain: Domain) {
 			}
 
 			println!("\tStatement: \t{},
+	Resolved: \t{},
 	Domain: \t{},
 	Valid: \t\t{}
 ================================================",
 		    	s_text.trim(),
+		    	resolved,
 		    	domain, 
 		    	equal
 			);
@@ -302,10 +343,12 @@ fn handle_other_domains(text: String, domain: Domain) {
 		}
 
 		println!("\tStatement: \t{},
+	Resolved: \t{},
 	Domain: \t{},
 	Valid: \t\t{}
 ================================================",
 	    	text,
+	    	resolved,
 	    	domain, 
 	    	equal
 		);
@@ -313,11 +356,16 @@ fn handle_other_domains(text: String, domain: Domain) {
 }
 
 fn main() {
-	let start = PreciseTime::now();
+	let argv: Vec<String> = env::args().collect();
 
-	let mut file = File::open("input.xml");
+	if argv.len() != 2 {
+        println!("\n\nError, exiting...\nUsage: {:?} <input>.xml", argv[0]);
+        process::exit(1);
+    }
+
+	let file = File::open(&argv[1]);
     let mut xml = String::new();
-    file.unwrap().read_to_string(&mut xml);
+    file.unwrap().read_to_string(&mut xml).unwrap();
 
     let mut domain_stack: Vec<Domain> = Vec::new();
    
@@ -362,7 +410,4 @@ fn main() {
 	    }
 	    buf.clear();
 	}
-
-	let end = PreciseTime::now();
-	println!("Finished In {} Seconds.", start.to(end));
 }
